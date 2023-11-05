@@ -1,0 +1,32 @@
+{
+  "name": "mini-zk-rollup",
+  "version": "1.0.0",
+  "description": "Minimalistic zk rollup implementation with Sparse Merkle Tree and EdDSA signatures",
+  "main": "index.js",
+  "repository": "https://github.com/TheBojda/mini-zk-rollup.git",
+  "author": "Laszlo Fazekas <thebojda@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@nomicfoundation/hardhat-ethers": "^3.0.4",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.9",
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^1.1.1",
+    "@typechain/ethers-v6": "^0.4.3",
+    "@typechain/hardhat": "^8.0.3",
+    "@types/chai": "^4.3.9",
+    "@types/mocha": "^10.0.3",
+    "chai": "^4.3.10",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5",
+    "ts-node": "^10.9.1",
+    "typechain": "^8.3.2",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "circom_tester": "^0.0.20",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7"
+  }
+}

@@ -1,0 +1,20 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+
+
+# Hardhat files
+
+/build/
+/dist/
+/.parcel-cache/
+package-lock.json
+yarn.lock
