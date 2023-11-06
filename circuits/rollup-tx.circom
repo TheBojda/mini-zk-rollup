@@ -1,7 +1,7 @@
 pragma circom 2.0.0;
 
 include "verify-transfer-req.circom";
-include "../node_modules/circomlib/circuits/smt/smtverifier.circom";
+include "../node_modules/circomlib/circuits/smt/smtprocessor.circom";
 include "../node_modules/circomlib/circuits/poseidon.circom";
 
 template RollupTransactionVerifier(nLevels) {
@@ -16,11 +16,12 @@ template RollupTransactionVerifier(nLevels) {
     signal input R8x;
     signal input R8y;
 
-    signal input root;
+    signal input oldRoot;
+    signal input newRoot;
     signal input siblings[nLevels];
 
     component transferRequestVerifier = VerifyTransferRequest();
-    component smtVerifier = SMTVerifier(nLevels);
+    component smtVerifier = SMTProcessor(nLevels);
     component poseidon = Poseidon(2);
 
     transferRequestVerifier.targetAddress <== targetAddress;
@@ -36,14 +37,16 @@ template RollupTransactionVerifier(nLevels) {
     poseidon.inputs[0] <== Ax;
     poseidon.inputs[1] <== Ay;
 
-    smtVerifier.enabled <== 1;
-    smtVerifier.fnc <== 0;
-    smtVerifier.root <== root;
+    smtVerifier.fnc[0] <== 0;
+    smtVerifier.fnc[1] <== 1;
+    smtVerifier.oldRoot <== oldRoot;
     smtVerifier.siblings <== siblings;
-    smtVerifier.oldKey <== 0;
-    smtVerifier.oldValue <== 0;
-    smtVerifier.isOld0 <== 0;
-    smtVerifier.key <== nftID;
-    smtVerifier.value <== poseidon.out;
+    smtVerifier.oldKey <== nftID;
+    smtVerifier.oldValue <== poseidon.out;
+    smtVerifier.isOld0 <== 0; 
+    smtVerifier.newKey <== nftID;
+    smtVerifier.newValue <== targetAddress;
+
+    newRoot === smtVerifier.newRoot; 
 
 }

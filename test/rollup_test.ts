@@ -1,4 +1,4 @@
-import { newMemEmptyTrie, buildEddsa, buildPoseidon, buildBabyjub } from 'circomlibjs'
+import { newMemEmptyTrie, buildEddsa, buildPoseidon } from 'circomlibjs'
 import { randomBytes } from 'crypto'
 import { assert } from "chai";
 import { wasm as wasm_tester } from 'circom_tester';
@@ -44,24 +44,12 @@ describe("mini-zk-rollup test", () => {
         }
     }
 
-
-    const verifyTransferRequest = async (request: TransferRequest): Promise<boolean> => {
-        // verify the transaction signature
-        const transactionHash = poseidon([buffer2hex(request.targetAddress), request.nftID, buffer2hex(request.transactionID)])
-        if (!eddsa.verifyPoseidon(transactionHash, request.signature, request.ownerPubKey))
-            return false;
-
-        // check ownership
-        const ownerAddress = await poseidon(request.ownerPubKey)
-        const nftOwnerAddress = await trie.find(request.nftID)
-        if (ownerAddress != nftOwnerAddress)
-            return false;
-
-        return true;
-    }
-
     const buffer2hex = (buff) => {
         return ethers.BigNumber.from(buff).toHexString()
+    }
+
+    const getNFTOwner = async (nftID: number) => {
+        return buffer2hex((await trie.find(nftID)).foundValue)
     }
 
     before(async () => {
@@ -79,7 +67,7 @@ describe("mini-zk-rollup test", () => {
             accounts[i] = {
                 prvKey: prvKey,
                 pubKey: pubKey,
-                address: poseidon(pubKey)
+                address: trie.F.toObject(poseidon(pubKey))
             }
         }
     })
@@ -108,11 +96,18 @@ describe("mini-zk-rollup test", () => {
         }
     })
 
-    it("Test rollup transaction verifier circuit", async () => {
-        const transferRequest = createTransferRequest(accounts[0], accounts[1], 1)
+    const transferNFT = async (from: Account, to: Account, nftID: number) => {
+        // creating transfer request
+        const transferRequest = createTransferRequest(from, to, nftID)
 
-        const res = await trie.find(transferRequest.nftID);
+        // move the NFT to the new owner
+        const res = await trie.update(nftID, transferRequest.targetAddress)
 
+        // check the new owner
+        const newOwner = await trie.find(transferRequest.nftID)
+        assert(newOwner, transferRequest.targetAddress)
+
+        // generate and check zkp
         let siblings = res.siblings;
         for (let i = 0; i < siblings.length; i++) siblings[i] = trie.F.toObject(siblings[i]);
         while (siblings.length < 10) siblings.push(0);
@@ -126,26 +121,20 @@ describe("mini-zk-rollup test", () => {
             R8x: eddsa.F.toObject(transferRequest.signature.R8[0]),
             R8y: eddsa.F.toObject(transferRequest.signature.R8[1]),
             S: transferRequest.signature.S,
-            root: trie.F.toObject(trie.root),
+            oldRoot: trie.F.toObject(res.oldRoot),
+            newRoot: trie.F.toObject(res.newRoot),
             siblings: siblings
         }, true);
 
         await verifyRollupTransactionCircuit.checkConstraints(w);
+    }
+
+    it("Transfer 1st NFT from account 0 to account 1", async () => {
+        await transferNFT(accounts[0], accounts[1], 1)
     })
 
-    it("Transfer 1. NFT from account 0 to account 1", async () => {
-        // creating transfer request
-        const transferRequest = createTransferRequest(accounts[0], accounts[1], 1)
-
-        // verifying transfer request, and check ownership
-        assert(verifyTransferRequest(transferRequest))
-
-        // move the NFT to the new owner
-        await trie.update(1, transferRequest.targetAddress)
-
-        // check the new owner
-        const newOwner = await trie.find(transferRequest.nftID)
-        assert(newOwner, transferRequest.targetAddress)
+    it("Transfer 1st NFT from account 1 to account 2", async () => {
+        await transferNFT(accounts[1], accounts[2], 1)
     })
 
 })
