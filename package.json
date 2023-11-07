@@ -6,6 +6,9 @@
   "repository": "https://github.com/TheBojda/mini-zk-rollup.git",
   "author": "Laszlo Fazekas <thebojda@gmail.com>",
   "license": "MIT",
+  "scripts": {
+    "prepare": "sh scripts/prepare.sh"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.4",
