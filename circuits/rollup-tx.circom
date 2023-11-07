@@ -17,8 +17,9 @@ template RollupTransactionVerifier(nLevels) {
     signal input R8y;
 
     signal input oldRoot;
-    signal input newRoot;
     signal input siblings[nLevels];
+
+    signal output newRoot;
 
     component transferRequestVerifier = VerifyTransferRequest();
     component smtVerifier = SMTProcessor(nLevels);
@@ -47,6 +48,6 @@ template RollupTransactionVerifier(nLevels) {
     smtVerifier.newKey <== nftID;
     smtVerifier.newValue <== targetAddress;
 
-    newRoot === smtVerifier.newRoot; 
+    newRoot <== smtVerifier.newRoot; 
 
 }

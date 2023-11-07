@@ -28,6 +28,7 @@ describe("mini-zk-rollup test", () => {
 
     let verifyTransferCircuit
     let verifyRollupTransactionCircuit
+    let rollupCircuit
 
     let accounts: Account[] = []
 
@@ -59,6 +60,7 @@ describe("mini-zk-rollup test", () => {
 
         verifyTransferCircuit = await wasm_tester(path.join(__dirname, "circuits", "verify-transfer-req-test.circom"));
         verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
+        rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
 
         for (let i = 0; i < 5; i++) {
             // generate private and public eddsa keys, the public address is the poseidon hash of the public key
@@ -122,11 +124,11 @@ describe("mini-zk-rollup test", () => {
             R8y: eddsa.F.toObject(transferRequest.signature.R8[1]),
             S: transferRequest.signature.S,
             oldRoot: trie.F.toObject(res.oldRoot),
-            newRoot: trie.F.toObject(res.newRoot),
             siblings: siblings
         }, true);
 
         await verifyRollupTransactionCircuit.checkConstraints(w);
+        await verifyRollupTransactionCircuit.assertOut(w, { newRoot: trie.F.toObject(res.newRoot) });
     }
 
     it("Transfer 1st NFT from account 0 to account 1", async () => {
@@ -135,6 +137,67 @@ describe("mini-zk-rollup test", () => {
 
     it("Transfer 1st NFT from account 1 to account 2", async () => {
         await transferNFT(accounts[1], accounts[2], 1)
+    })
+
+    const batchTransferNFTs = async (transferRequestList: TransferRequest[]) => {
+        let targetAddressList = []
+        let nftIDList = []
+        let transactionIDList = []
+        let AxList = []
+        let AyList = []
+        let SList = []
+        let R8xList = []
+        let R8yList = []
+        let siblingsList = []
+
+        const oldRoot = trie.F.toObject(trie.root)
+
+        for (const transferRequest of transferRequestList) {
+            targetAddressList.push(buffer2hex(transferRequest.targetAddress))
+            nftIDList.push(transferRequest.nftID)
+            transactionIDList.push(buffer2hex(transferRequest.transactionID))
+            AxList.push(eddsa.F.toObject(transferRequest.ownerPubKey[0]))
+            AyList.push(eddsa.F.toObject(transferRequest.ownerPubKey[1]))
+            SList.push(transferRequest.signature.S)
+            R8xList.push(eddsa.F.toObject(transferRequest.signature.R8[0]))
+            R8yList.push(eddsa.F.toObject(transferRequest.signature.R8[1]))
+
+            const res = await trie.update(transferRequest.nftID, transferRequest.targetAddress)
+
+            let siblings = res.siblings;
+            for (let i = 0; i < siblings.length; i++) siblings[i] = trie.F.toObject(siblings[i]);
+            while (siblings.length < 10) siblings.push(0);
+
+            siblingsList.push(siblings)
+        }
+
+        const newRoot = trie.F.toObject(trie.root)
+
+        const w = await rollupCircuit.calculateWitness({
+            targetAddressList: targetAddressList,
+            nftIDList: nftIDList,
+            transactionIDList: transactionIDList,
+            AxList: AxList,
+            AyList: AyList,
+            R8xList: R8xList,
+            R8yList: R8yList,
+            SList: SList,
+            siblingsList: siblingsList,
+            oldRoot: oldRoot,
+            newRoot: newRoot
+        }, true);
+
+        await rollupCircuit.checkConstraints(w);
+    }
+
+    it("Test the rollup", async () => {
+        const transferRequest1 = createTransferRequest(accounts[0], accounts[1], 2)
+        const transferRequest2 = createTransferRequest(accounts[1], accounts[2], 2)
+        const transferRequest3 = createTransferRequest(accounts[2], accounts[3], 2)
+        const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 3)
+        const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 3)
+
+        await batchTransferNFTs([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
     })
 
 })
