@@ -67,8 +67,8 @@ describe("mini-zk-rollup test", () => {
         verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
         rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
 
-        // const RollupVerifier = await ethers.getContractFactory("RollupVerifier");
-        // rollupVerifier = await RollupVerifier.deploy();
+        const RollupVerifier = await ethers.getContractFactory("RollupVerifier");
+        rollupVerifier = await RollupVerifier.deploy();
 
         for (let i = 0; i < 5; i++) {
             // generate private and public eddsa keys, the public address is the poseidon hash of the public key
@@ -246,15 +246,14 @@ describe("mini-zk-rollup test", () => {
 
     it("Test the rollup", async () => {
         const transferRequest1 = createTransferRequest(accounts[0], accounts[1], 2)
-        // const transferRequest2 = createTransferRequest(accounts[1], accounts[2], 2)
-        // const transferRequest3 = createTransferRequest(accounts[2], accounts[3], 2)
-        // const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 3)
-        // const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 3)
+        const transferRequest2 = createTransferRequest(accounts[1], accounts[2], 2)
+        const transferRequest3 = createTransferRequest(accounts[2], accounts[3], 2)
+        const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 3)
+        const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 3)
 
-        await batchTransferNFTs([transferRequest1])
+        await batchTransferNFTs([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
     })
 
-    /*
     const generateBatchTransferZKP = async (transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
         let nftIDList = []
@@ -289,26 +288,6 @@ describe("mini-zk-rollup test", () => {
 
         const newRoot = trie.F.toObject(trie.root)
 
-        // ---
-
-        const w = await rollupCircuit.calculateWitness({
-            targetAddressList: targetAddressList,
-            nftIDList: nftIDList,
-            transactionIDList: transactionIDList,
-            AxList: AxList,
-            AyList: AyList,
-            R8xList: R8xList,
-            R8yList: R8yList,
-            SList: SList,
-            siblingsList: siblingsList,
-            oldRoot: oldRoot,
-            newRoot: newRoot
-        }, true);
-
-        await rollupCircuit.checkConstraints(w);
-
-        // ---
-
         return await snarkjs.groth16.fullProve(
             {
                 targetAddressList: targetAddressList,
@@ -334,21 +313,19 @@ describe("mini-zk-rollup test", () => {
         const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 5)
         const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 5)
 
-        const { proof, publicSignals } = await generateBatchTransferZKP([transferRequest1])
-        console.log(proof, publicSignals)
+        const { proof, publicSignals } = await generateBatchTransferZKP([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
 
         const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
         const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
-        console.log(res)
-
-        /*
-        const callData = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals)
-        console.log(typeof callData)
-
-        const res = await rollupVerifier.verifyProof(callData)
         assert(res)
-        *
+
+        const res2 = await rollupVerifier.verifyProof(
+            [proof.pi_a[0], proof.pi_a[1]],
+            [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
+            [proof.pi_c[0], proof.pi_c[1]],
+            publicSignals
+        )
+        assert(res2)
     })
-    */
 
 })

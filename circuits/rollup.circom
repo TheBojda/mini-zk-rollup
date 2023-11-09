@@ -44,4 +44,4 @@ template Rollup(nLevels, nTransactions) {
 
 }
 
-component main {public [targetAddressList, nftIDList, transactionIDList]} = Rollup(10, 1);
+component main {public [targetAddressList, nftIDList, transactionIDList]} = Rollup(10, 5);
