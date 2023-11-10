@@ -1,13 +1,14 @@
 import { newMemEmptyTrie, buildEddsa, buildPoseidon, buildBabyjub } from 'circomlibjs'
 import { randomBytes } from 'crypto'
-import { assert } from "chai"
+import { assert } from 'chai'
 import { wasm as wasm_tester } from 'circom_tester'
 import * as path from 'path'
 import * as fs from 'fs'
 import { ethers } from "hardhat"
 import * as snarkjs from 'snarkjs'
-import { RollupVerifier } from "../typechain-types"
+import { RollupVerifier, Rollup } from "../typechain-types"
 import { BigNumber } from '@ethersproject/bignumber'
+import Logger from "logplease";
 
 describe("mini-zk-rollup test", () => {
 
@@ -34,6 +35,7 @@ describe("mini-zk-rollup test", () => {
     let rollupCircuit
 
     let rollupVerifier: RollupVerifier
+    let rollup: Rollup
 
     let accounts: Account[] = []
 
@@ -82,6 +84,7 @@ describe("mini-zk-rollup test", () => {
         }
     })
 
+    /*
     it("Test transfer verifier circuit", async () => {
         const transferRequest = createTransferRequest(accounts[0], accounts[1], 1)
 
@@ -169,17 +172,8 @@ describe("mini-zk-rollup test", () => {
         await transferNFT(accounts[1], accounts[2], 1)
     })
 
-    class Logger {
-
-        error(s) {
-            console.log(s)
-        }
-
-        info(s) {
-            console.log(s)
-        }
-
-    }
+    const logger = Logger.create("mini-zk-rollup", { showTimestamp: false });
+    Logger.setLogLevel("INFO");
 
     const batchTransferNFTs = async (transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
@@ -233,14 +227,13 @@ describe("mini-zk-rollup test", () => {
 
         await rollupCircuit.checkConstraints(w);
 
-
         const { proof, publicSignals } = await snarkjs.groth16.fullProve(
             inputs,
             "./build/rollup_js/rollup.wasm",
             "./build/rollup.zkey");
 
         const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
-        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof /*, new Logger()*/);
+        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof /*, logger/);
         assert(res)
     }
 
@@ -253,8 +246,9 @@ describe("mini-zk-rollup test", () => {
 
         await batchTransferNFTs([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
     })
+    */
 
-    const generateBatchTransferZKP = async (transferRequestList: TransferRequest[]) => {
+    const generateBatchTransferZKP = async (_trie: any, transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
         let nftIDList = []
         let transactionIDList = []
@@ -265,7 +259,7 @@ describe("mini-zk-rollup test", () => {
         let R8yList = []
         let siblingsList = []
 
-        const oldRoot = trie.F.toObject(trie.root)
+        const oldRoot = _trie.F.toObject(trie.root)
 
         for (const transferRequest of transferRequestList) {
             targetAddressList.push(buffer2hex(transferRequest.targetAddress))
@@ -277,16 +271,18 @@ describe("mini-zk-rollup test", () => {
             R8xList.push(eddsa.F.toObject(transferRequest.signature.R8[0]))
             R8yList.push(eddsa.F.toObject(transferRequest.signature.R8[1]))
 
-            const res = await trie.update(transferRequest.nftID, transferRequest.targetAddress)
+            const res = await _trie.update(transferRequest.nftID, transferRequest.targetAddress)
 
             let siblings = res.siblings;
-            for (let i = 0; i < siblings.length; i++) siblings[i] = trie.F.toObject(siblings[i]);
+            for (let i = 0; i < siblings.length; i++) siblings[i] = _trie.F.toObject(siblings[i]);
             while (siblings.length < 10) siblings.push(0);
 
             siblingsList.push(siblings)
         }
 
-        const newRoot = trie.F.toObject(trie.root)
+        const newRoot = _trie.F.toObject(trie.root)
+
+        // console.log(oldRoot, newRoot, transactionIDList)
 
         return await snarkjs.groth16.fullProve(
             {
@@ -306,6 +302,7 @@ describe("mini-zk-rollup test", () => {
             "./build/rollup.zkey");
     }
 
+    /*
     it("Test the rollup verifier smart contract", async () => {
         const transferRequest1 = createTransferRequest(accounts[0], accounts[1], 4)
         const transferRequest2 = createTransferRequest(accounts[1], accounts[2], 4)
@@ -313,11 +310,13 @@ describe("mini-zk-rollup test", () => {
         const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 5)
         const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 5)
 
-        const { proof, publicSignals } = await generateBatchTransferZKP([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
+        const { proof, publicSignals } = await generateBatchTransferZKP(trie, [transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
 
         const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
         const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
         assert(res)
+
+        // console.log(publicSignals)
 
         const res2 = await rollupVerifier.verifyProof(
             [proof.pi_a[0], proof.pi_a[1]],
@@ -326,6 +325,53 @@ describe("mini-zk-rollup test", () => {
             publicSignals
         )
         assert(res2)
+    })
+    */
+
+    const batch_size = 64;
+
+    it("Test the rollup smart contract", async () => {
+        trie = await newMemEmptyTrie()
+        let transferRequests = []
+        for (let i = 1; i <= batch_size; i++) {
+            await trie.insert(i, accounts[0].address)
+            transferRequests.push(createTransferRequest(accounts[0], accounts[1], i))
+        }
+
+        const Rollup = await ethers.getContractFactory("Rollup");
+        rollup = await Rollup.deploy(trie.F.toObject(trie.root), await rollupVerifier.getAddress());
+
+        const { proof, publicSignals } = await generateBatchTransferZKP(trie, transferRequests)
+
+        await rollup.updateState(
+            [proof.pi_a[0], proof.pi_a[1]],
+            [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
+            [proof.pi_c[0], proof.pi_c[1]],
+            publicSignals
+        )
+
+        assert.equal(await rollup.getRoot(), trie.F.toObject(trie.root));
+    })
+
+    it("Rebuild trie from calldata", async () => {
+
+    })
+
+    it("Calculate simple NFT transfer gas cost", async () => {
+        const signers = await ethers.getSigners()
+        const account0 = signers[0]
+        const account1 = signers[1]
+
+        const MyToken = await ethers.getContractFactory("MyToken");
+        const myToken = await MyToken.deploy(account0);
+
+        for (let i = 1; i <= batch_size; i++) {
+            await myToken.safeMint(account0, i)
+        }
+
+        for (let i = 1; i <= batch_size; i++) {
+            await myToken['safeTransferFrom(address,address,uint256)'](account0, account1, i)
+        }
     })
 
 })

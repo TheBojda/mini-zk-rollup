@@ -4,9 +4,12 @@ include "rollup-tx.circom";
 
 template Rollup(nLevels, nTransactions) {
 
+    signal input oldRoot;
+    signal input newRoot;
+
+    signal input transactionIDList[nTransactions];
     signal input targetAddressList[nTransactions];
     signal input nftIDList[nTransactions];
-    signal input transactionIDList[nTransactions];
 
     signal input AxList[nTransactions];
     signal input AyList[nTransactions];
@@ -16,8 +19,6 @@ template Rollup(nLevels, nTransactions) {
 
     signal input siblingsList[nTransactions][nLevels];
 
-    signal input oldRoot;
-    signal input newRoot;
 
     var root = oldRoot;
     component rollupVerifiers[nTransactions];
@@ -44,4 +45,4 @@ template Rollup(nLevels, nTransactions) {
 
 }
 
-component main {public [targetAddressList, nftIDList, transactionIDList]} = Rollup(10, 5);
+component main {public [oldRoot, newRoot, targetAddressList, nftIDList]} = Rollup(10, 64);
