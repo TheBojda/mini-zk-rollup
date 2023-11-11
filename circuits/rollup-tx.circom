@@ -8,7 +8,7 @@ template RollupTransactionVerifier(nLevels) {
 
     signal input targetAddress;
     signal input nftID;
-    signal input transactionID;
+    signal input nonce;
 
     signal input Ax;
     signal input Ay;
@@ -19,15 +19,20 @@ template RollupTransactionVerifier(nLevels) {
     signal input oldRoot;
     signal input siblings[nLevels];
 
+    signal input nonceOldRoot;
+    signal input nonceSiblings[nLevels];
+
     signal output newRoot;
+    signal output nonceNewRoot;
 
     component transferRequestVerifier = VerifyTransferRequest();
     component smtVerifier = SMTProcessor(nLevels);
+    component nonceVerifier = SMTProcessor(nLevels);
     component poseidon = Poseidon(2);
 
     transferRequestVerifier.targetAddress <== targetAddress;
     transferRequestVerifier.nftID <== nftID;
-    transferRequestVerifier.transactionID <== transactionID;
+    transferRequestVerifier.nonce <== nonce;
 
     transferRequestVerifier.Ax <== Ax;
     transferRequestVerifier.Ay <== Ay;
@@ -48,6 +53,17 @@ template RollupTransactionVerifier(nLevels) {
     smtVerifier.newKey <== nftID;
     smtVerifier.newValue <== targetAddress;
 
+    nonceVerifier.fnc[0] <== 0;
+    nonceVerifier.fnc[1] <== 1;
+    nonceVerifier.oldRoot <== nonceOldRoot;
+    nonceVerifier.siblings <== nonceSiblings;
+    nonceVerifier.oldKey <== nftID;
+    nonceVerifier.oldValue <== nonce;
+    nonceVerifier.isOld0 <== 0; 
+    nonceVerifier.newKey <== nftID;
+    nonceVerifier.newValue <== nonce + 1;
+
     newRoot <== smtVerifier.newRoot; 
+    nonceNewRoot <== nonceVerifier.newRoot;
 
 }

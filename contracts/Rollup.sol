@@ -9,22 +9,21 @@ interface IVerifier {
         uint[2] memory a,
         uint[2][2] memory b,
         uint[2] memory c,
-        uint[130] memory input
+        uint[132] memory input
     ) external pure returns (bool r);
 }
 
 contract Rollup {
-    uint constant BATCH_SIZE = 64;
-
-    event RootChanged(uint newRoot);
-
     IVerifier public immutable verifier;
 
-    uint root = 0;
-    mapping(uint => bool) public transactionHashes;
+    event RootChanged(uint newRoot, uint newNonceRoot);
 
-    constructor(uint _root, IVerifier _verifier) {
+    uint root;
+    uint nonceRoot;
+
+    constructor(uint _root, uint _nonceRoot, IVerifier _verifier) {
         root = _root;
+        nonceRoot = _nonceRoot;
         verifier = _verifier;
     }
 
@@ -32,21 +31,25 @@ contract Rollup {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[130] calldata _pubSignals
+        uint[132] calldata _pubSignals
     ) external {
-        require(verifier.verifyProof(_pA, _pB, _pC, _pubSignals), "Verification failed");
         require(root == _pubSignals[0], "Invalid old root");
-/*
-        for (uint i = 2; i < 2 + BATCH_SIZE; i++) {
-            require(!transactionHashes[_pubSignals[i]], "Transaction hash is already used");
-            transactionHashes[_pubSignals[i]] = true;
-        }
-*/
+        require(nonceRoot == _pubSignals[2], "Invalid old nonce root");
+        require(
+            verifier.verifyProof(_pA, _pB, _pC, _pubSignals),
+            "Verification failed"
+        );
+
         root = _pubSignals[1];
-        emit RootChanged(root);
+        nonceRoot = _pubSignals[3];
+        emit RootChanged(root, nonceRoot);
     }
 
     function getRoot() public view virtual returns (uint) {
         return root;
+    }
+
+    function getNonceRoot() public view virtual returns (uint) {
+        return nonceRoot;
     }
 }

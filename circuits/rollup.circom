@@ -7,7 +7,10 @@ template Rollup(nLevels, nTransactions) {
     signal input oldRoot;
     signal input newRoot;
 
-    signal input transactionIDList[nTransactions];
+    signal input nonceOldRoot;
+    signal input nonceNewRoot;
+
+    signal input nonceList[nTransactions];
     signal input targetAddressList[nTransactions];
     signal input nftIDList[nTransactions];
 
@@ -18,16 +21,17 @@ template Rollup(nLevels, nTransactions) {
     signal input R8yList[nTransactions];
 
     signal input siblingsList[nTransactions][nLevels];
-
+    signal input nonceSiblingsList[nTransactions][nLevels];
 
     var root = oldRoot;
+    var nonceRoot = nonceOldRoot;
     component rollupVerifiers[nTransactions];
     for (var i = 0; i < nTransactions; i++) {
         rollupVerifiers[i] = RollupTransactionVerifier(nLevels);
 
         rollupVerifiers[i].targetAddress <== targetAddressList[i];
         rollupVerifiers[i].nftID <== nftIDList[i];
-        rollupVerifiers[i].transactionID <== transactionIDList[i];
+        rollupVerifiers[i].nonce <== nonceList[i];
 
         rollupVerifiers[i].Ax <== AxList[i];
         rollupVerifiers[i].Ay <== AyList[i];
@@ -38,11 +42,16 @@ template Rollup(nLevels, nTransactions) {
         rollupVerifiers[i].siblings <== siblingsList[i];
         rollupVerifiers[i].oldRoot <== root;
 
+        rollupVerifiers[i].nonceSiblings <== nonceSiblingsList[i];
+        rollupVerifiers[i].nonceOldRoot <== nonceRoot;
+
         root = rollupVerifiers[i].newRoot;
+        nonceRoot = rollupVerifiers[i].nonceNewRoot;
     }
 
     newRoot === root;
+    nonceNewRoot === nonceRoot;
 
 }
 
-component main {public [oldRoot, newRoot, targetAddressList, nftIDList]} = Rollup(10, 64);
+component main {public [oldRoot, newRoot, nonceOldRoot, nonceNewRoot, targetAddressList, nftIDList]} = Rollup(10, 64);

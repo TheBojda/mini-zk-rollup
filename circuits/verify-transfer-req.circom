@@ -8,7 +8,7 @@ template VerifyTransferRequest() {
 
     signal input targetAddress;
     signal input nftID;
-    signal input transactionID;
+    signal input nonce;
 
     signal input Ax;
     signal input Ay;
@@ -21,7 +21,7 @@ template VerifyTransferRequest() {
 
     poseidon.inputs[0] <== targetAddress;
     poseidon.inputs[1] <== nftID;
-    poseidon.inputs[2] <== transactionID;
+    poseidon.inputs[2] <== nonce;
 
     eddsa.enabled <== 1;
     eddsa.Ax <== Ax;
