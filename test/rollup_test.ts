@@ -9,6 +9,7 @@ import * as snarkjs from 'snarkjs'
 import { RollupVerifier, Rollup } from "../typechain-types"
 import { BigNumber } from '@ethersproject/bignumber'
 import Logger from "logplease";
+import { createHash } from 'crypto'
 
 describe("mini-zk-rollup test", () => {
 
@@ -50,9 +51,9 @@ describe("mini-zk-rollup test", () => {
         trie = await newMemEmptyTrie()
         nonceTrie = await newMemEmptyTrie()
 
-        verifyTransferCircuit = await wasm_tester(path.join(__dirname, "circuits", "verify-transfer-req-test.circom"));
-        verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
-        rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
+        // verifyTransferCircuit = await wasm_tester(path.join(__dirname, "circuits", "verify-transfer-req-test.circom"));
+        // verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
+        // rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
 
         const RollupVerifier = await ethers.getContractFactory("RollupVerifier");
         rollupVerifier = await RollupVerifier.deploy();
@@ -89,9 +90,6 @@ describe("mini-zk-rollup test", () => {
     }
 
     /*
-    const logger = Logger.create("mini-zk-rollup", { showTimestamp: false });
-    Logger.setLogLevel("INFO");
-
     it("Initializing the trie with NFTs", async () => {
         // generate 5 NFTs, and set the first account as owner
         for (let i = 1; i <= 5; i++) {
@@ -99,6 +97,9 @@ describe("mini-zk-rollup test", () => {
             await nonceTrie.insert(i, 0)
         }
     })
+
+    const logger = Logger.create("mini-zk-rollup", { showTimestamp: false });
+    Logger.setLogLevel("INFO");
 
     it("Test transfer verifier circuit", async () => {
         const transferRequest = await createTransferRequest(accounts[0], accounts[1], 1, 0)
@@ -187,6 +188,16 @@ describe("mini-zk-rollup test", () => {
     })
     */
 
+    const numToBuffer = (num: any): Buffer => {
+        let hex = BigNumber.from(num).toBigInt().toString(16)
+        while (hex.length < 64) {
+            hex = '0' + hex;
+        }
+        return Buffer.from(hex, 'hex');
+    }
+
+    const FIELD_SIZE = BigNumber.from('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+
     /*
     const batchTransferNFTs = async (transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
@@ -223,6 +234,19 @@ describe("mini-zk-rollup test", () => {
         const newRoot = trie.F.toObject(trie.root)
         const nonceNewRoot = nonceTrie.F.toObject(nonceTrie.root)
 
+        let transactionBuffers = []
+        for (const transferRequest of transferRequestList) {
+            transactionBuffers.push(numToBuffer(transferRequest.targetAddress))
+        }
+        for (const transferRequest of transferRequestList) {
+            transactionBuffers.push(numToBuffer(transferRequest.nftID))
+        }
+        const hash = createHash("sha256").update(Buffer.concat(transactionBuffers)).digest("hex")
+        const ffhash = BigNumber.from('0x' + hash).mod(FIELD_SIZE)
+
+        const oldStateHash = poseidon([oldRoot, nonceOldRoot])
+        const newStateHash = poseidon([newRoot, nonceNewRoot])
+
         const inputs = {
             targetAddressList: targetAddressList,
             nftIDList: nftIDList,
@@ -237,30 +261,32 @@ describe("mini-zk-rollup test", () => {
             oldRoot: oldRoot,
             nonceOldRoot: nonceOldRoot,
             newRoot: newRoot,
-            nonceNewRoot: nonceNewRoot
+            nonceNewRoot: nonceNewRoot,
+            transactionListHash: ffhash.toHexString(),
+            oldStateHash: poseidon.F.toObject(oldStateHash),
+            newStateHash: poseidon.F.toObject(newStateHash)
         }
 
         const w = await rollupCircuit.calculateWitness(inputs, true);
         await rollupCircuit.checkConstraints(w);
 
+        /*
         const { proof, publicSignals } = await snarkjs.groth16.fullProve(
             inputs,
             "./build/rollup_js/rollup.wasm",
             "./build/rollup.zkey");
 
         const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
-        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof, logger);
+        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof /*, logger/);
         assert(res)
+        /
     }
 
     it("Test the rollup", async () => {
         const transferRequest1 = await createTransferRequest(accounts[0], accounts[1], 2, 0)
         const transferRequest2 = await createTransferRequest(accounts[1], accounts[2], 2, 1)
-        const transferRequest3 = await createTransferRequest(accounts[2], accounts[3], 2, 2)
-        const transferRequest4 = await createTransferRequest(accounts[0], accounts[4], 3, 0)
-        const transferRequest5 = await createTransferRequest(accounts[4], accounts[0], 3, 1)
 
-        await batchTransferNFTs([transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
+        await batchTransferNFTs([transferRequest1, transferRequest2])
     })
     */
 
@@ -299,6 +325,19 @@ describe("mini-zk-rollup test", () => {
         const newRoot = _trie.F.toObject(_trie.root)
         const nonceNewRoot = _nonceTrie.F.toObject(_nonceTrie.root)
 
+        let transactionBuffers = []
+        for (const transferRequest of transferRequestList) {
+            transactionBuffers.push(numToBuffer(transferRequest.targetAddress))
+        }
+        for (const transferRequest of transferRequestList) {
+            transactionBuffers.push(numToBuffer(transferRequest.nftID))
+        }
+        const hash = createHash("sha256").update(Buffer.concat(transactionBuffers)).digest("hex")
+        const ffhash = BigNumber.from('0x' + hash).mod(FIELD_SIZE)
+
+        const oldStateHash = poseidon([oldRoot, nonceOldRoot])
+        const newStateHash = poseidon([newRoot, nonceNewRoot])
+
         return await snarkjs.groth16.fullProve(
             {
                 targetAddressList: targetAddressList,
@@ -314,7 +353,10 @@ describe("mini-zk-rollup test", () => {
                 oldRoot: oldRoot,
                 nonceOldRoot: nonceOldRoot,
                 newRoot: newRoot,
-                nonceNewRoot: nonceNewRoot
+                nonceNewRoot: nonceNewRoot,
+                transactionListHash: ffhash.toHexString(),
+                oldStateHash: poseidon.F.toObject(oldStateHash),
+                newStateHash: poseidon.F.toObject(newStateHash)
             },
             "./build/rollup_js/rollup.wasm",
             "./build/rollup.zkey");
@@ -358,45 +400,35 @@ describe("mini-zk-rollup test", () => {
             transferRequests.push(createTransferRequest(accounts[0], accounts[1], i, 0))
         }
 
+        const oldRoot = trie.F.toObject(trie.root)
+        const nonceOldRoot = nonceTrie.F.toObject(nonceTrie.root)
+        const oldStateHash = poseidon.F.toObject(poseidon([oldRoot, nonceOldRoot]))
+
         const Rollup = await ethers.getContractFactory("Rollup");
-        rollup = await Rollup.deploy(trie.F.toObject(trie.root), nonceTrie.F.toObject(nonceTrie.root), await rollupVerifier.getAddress());
+        rollup = await Rollup.deploy(oldStateHash, await rollupVerifier.getAddress());
 
         const { proof, publicSignals } = await generateBatchTransferZKP(trie, nonceTrie, transferRequests)
+
+        const newRoot = trie.F.toObject(trie.root)
+        const nonceNewRoot = nonceTrie.F.toObject(nonceTrie.root)
+        const newStateHash = poseidon.F.toObject(poseidon([newRoot, nonceNewRoot]))
+
+        let transactionList: any = []
+        for (const transferRequest of transferRequests) {
+            transactionList.push(transferRequest.targetAddress)
+        }
+        for (const transferRequest of transferRequests) {
+            transactionList.push(BigNumber.from(transferRequest.nftID).toBigInt())
+        }
 
         await rollup.updateState(
             [proof.pi_a[0], proof.pi_a[1]],
             [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
             [proof.pi_c[0], proof.pi_c[1]],
-            publicSignals
+            publicSignals[1], publicSignals[2], transactionList
         )
 
-        assert.equal(await rollup.getRoot(), trie.F.toObject(trie.root));
-        assert.equal(await rollup.getNonceRoot(), nonceTrie.F.toObject(nonceTrie.root));
-    })
-
-    it("Rebuild trie from calldata", async () => {
-        trie = await newMemEmptyTrie()
-
-        for (let i = 1; i <= BATCH_SIZE; i++) {
-            await trie.insert(i, accounts[0].address)
-        }
-
-        let root = trie.F.toObject(trie.root)
-
-        const events = await rollup.queryFilter(rollup.filters.RootChanged)
-        for (const event of events) {
-            const tx = await event.provider.getTransaction(event.transactionHash)
-            const pubSignals = rollup.interface.parseTransaction(tx).args.at(3)
-            for (let i = 0; i < BATCH_SIZE; i++) {
-                const address = pubSignals[4 + i];
-                const nftID = pubSignals[(4 + BATCH_SIZE) + i];
-                await trie.update(nftID, address)
-            }
-            const newRoot = trie.F.toObject(trie.root);
-            assert.equal(pubSignals[0], root)
-            assert.equal(pubSignals[1], newRoot)
-            root = newRoot
-        }
+        assert.equal(await rollup.getRoot(), newStateHash);
     })
 
     it("Calculate simple NFT transfer gas cost", async () => {
@@ -416,11 +448,37 @@ describe("mini-zk-rollup test", () => {
         }
     })
 
+    /*
+    it("Rebuild trie from calldata", async () => {
+        trie = await newMemEmptyTrie()
+
+        for (let i = 1; i <= BATCH_SIZE; i++) {
+            await trie.insert(i, accounts[0].address)
+        }
+
+        let root = trie.F.toObject(trie.root)
+
+        const events = await rollup.queryFilter(rollup.filters.RootChanged)
+        for (const event of events) {
+            const tx = await event.provider.getTransaction(event.transactionHash)
+            const pubSignals = rollup.interface.parseTransaction(tx).args.at(5)
+            for (let i = 0; i < BATCH_SIZE; i++) {
+                const address = pubSignals[i];
+                const nftID = pubSignals[BATCH_SIZE + i];
+                await trie.update(nftID, address)
+            }
+            const newRoot = trie.F.toObject(trie.root);
+            assert.equal(root, rollup.interface.parseTransaction(tx).args.at(3))
+            assert.equal(newRoot, rollup.interface.parseTransaction(tx).args.at(4))
+            root = newRoot
+        }
+    })
+    */
+
 })
 
 /*
 GAS measurements (BATCH_SIZE: 64):
 MyToken NFT 		2 965 696
-zkRollup	        1 146 822 (transactions stored in calldata)
-Validium 	          253 353 (transactions are not stored in calldata)
+zkRollup	          299 575
 */

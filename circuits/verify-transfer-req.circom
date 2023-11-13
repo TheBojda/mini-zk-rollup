@@ -2,7 +2,6 @@ pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/eddsaposeidon.circom";
 include "../node_modules/circomlib/circuits/poseidon.circom";
-include "../node_modules/circomlib/circuits/bitify.circom";
 
 template VerifyTransferRequest() {
 
@@ -19,9 +18,13 @@ template VerifyTransferRequest() {
     component eddsa = EdDSAPoseidonVerifier();
     component poseidon = Poseidon(3);
 
+    // calculate the transaction hash
+
     poseidon.inputs[0] <== targetAddress;
     poseidon.inputs[1] <== nftID;
     poseidon.inputs[2] <== nonce;
+
+    // verify the signature on the transaction hash
 
     eddsa.enabled <== 1;
     eddsa.Ax <== Ax;

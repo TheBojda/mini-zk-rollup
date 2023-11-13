@@ -1,6 +1,9 @@
 pragma circom 2.0.0;
 
 include "rollup-tx.circom";
+include "../node_modules/circomlib/circuits/sha256/sha256.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
+include "../node_modules/circomlib/circuits/poseidon.circom";
 
 template Rollup(nLevels, nTransactions) {
 
@@ -22,6 +25,12 @@ template Rollup(nLevels, nTransactions) {
 
     signal input siblingsList[nTransactions][nLevels];
     signal input nonceSiblingsList[nTransactions][nLevels];
+
+    signal input transactionListHash;
+    signal input oldStateHash;
+    signal input newStateHash;
+
+    // verify the transactions in the transaction list, and calculate the new roots
 
     var root = oldRoot;
     var nonceRoot = nonceOldRoot;
@@ -49,9 +58,54 @@ template Rollup(nLevels, nTransactions) {
         nonceRoot = rollupVerifiers[i].nonceNewRoot;
     }
 
+    // compute sha256 hash of the transaction list
+
+    component sha = Sha256(nTransactions * 2 * 32 * 8);
+    component address2bits[nTransactions];
+    component nftid2bits[nTransactions];
+    
+    var c = 0;
+    
+    for(var i=0; i<nTransactions; i++) {
+        address2bits[i] = Num2Bits(32 * 8);
+        address2bits[i].in <== targetAddressList[i];
+        for(var j=0; j<32 * 8; j++) {
+            sha.in[c] <== address2bits[i].out[(32 * 8) - 1 - j];
+            c++;
+        }
+    }
+
+    for(var i=0; i<nTransactions; i++) {
+        nftid2bits[i] = Num2Bits(32 * 8);
+        nftid2bits[i].in <== nftIDList[i];
+        for(var j=0; j<32 * 8; j++) {
+            sha.in[c] <== nftid2bits[i].out[(32 * 8) - 1 - j];
+            c++;
+        }
+    }
+
+    component bits2num = Bits2Num(256);
+    for(var i=0; i<256; i++) {
+        bits2num.in[i] <== sha.out[255 - i];
+    }
+
+    // check the constraints
+
+    transactionListHash === bits2num.out;
     newRoot === root;
     nonceNewRoot === nonceRoot;
 
+    component oldStateHasher = Poseidon(2);
+    oldStateHasher.inputs[0] <== oldRoot;
+    oldStateHasher.inputs[1] <== nonceOldRoot;
+
+    component newStateHasher = Poseidon(2);
+    newStateHasher.inputs[0] <== newRoot;
+    newStateHasher.inputs[1] <== nonceNewRoot;
+
+    oldStateHash === oldStateHasher.out;
+    newStateHash === newStateHasher.out;
+
 }
 
-component main {public [oldRoot, newRoot, nonceOldRoot, nonceNewRoot, targetAddressList, nftIDList]} = Rollup(10, 64);
+component main {public [oldStateHash, newStateHash, transactionListHash]} = Rollup(10, 64);

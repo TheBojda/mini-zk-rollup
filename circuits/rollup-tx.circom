@@ -30,6 +30,8 @@ template RollupTransactionVerifier(nLevels) {
     component nonceVerifier = SMTProcessor(nLevels);
     component poseidon = Poseidon(2);
 
+    // verify the transfer request
+
     transferRequestVerifier.targetAddress <== targetAddress;
     transferRequestVerifier.nftID <== nftID;
     transferRequestVerifier.nonce <== nonce;
@@ -39,6 +41,10 @@ template RollupTransactionVerifier(nLevels) {
     transferRequestVerifier.S <== S;
     transferRequestVerifier.R8x <== R8x;
     transferRequestVerifier.R8y <== R8y;
+
+    // verify the SMT update
+    // the old value of the NFT ID key has to be the poseidon hash of the signers public key, 
+    // the new value is the target address 
 
     poseidon.inputs[0] <== Ax;
     poseidon.inputs[1] <== Ay;
@@ -52,6 +58,8 @@ template RollupTransactionVerifier(nLevels) {
     smtVerifier.isOld0 <== 0; 
     smtVerifier.newKey <== nftID;
     smtVerifier.newValue <== targetAddress;
+
+    // verify nonce SMT update, the new value has to be the old value + 1
 
     nonceVerifier.fnc[0] <== 0;
     nonceVerifier.fnc[1] <== 1;
