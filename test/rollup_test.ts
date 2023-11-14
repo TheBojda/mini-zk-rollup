@@ -3,7 +3,6 @@ import { randomBytes } from 'crypto'
 import { assert } from 'chai'
 import { wasm as wasm_tester } from 'circom_tester'
 import * as path from 'path'
-import * as fs from 'fs'
 import { ethers } from "hardhat"
 import * as snarkjs from 'snarkjs'
 import { RollupVerifier, Rollup } from "../typechain-types"
@@ -51,9 +50,9 @@ describe("mini-zk-rollup test", () => {
         trie = await newMemEmptyTrie()
         nonceTrie = await newMemEmptyTrie()
 
-        // verifyTransferCircuit = await wasm_tester(path.join(__dirname, "circuits", "verify-transfer-req-test.circom"));
-        // verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
-        // rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
+        verifyTransferCircuit = await wasm_tester(path.join(__dirname, "circuits", "verify-transfer-req-test.circom"));
+        verifyRollupTransactionCircuit = await wasm_tester(path.join(__dirname, "circuits", "rollup-tx-test.circom"));
+        rollupCircuit = await wasm_tester(path.join(__dirname, "../circuits", "rollup.circom"));
 
         const RollupVerifier = await ethers.getContractFactory("RollupVerifier");
         rollupVerifier = await RollupVerifier.deploy();
@@ -89,7 +88,6 @@ describe("mini-zk-rollup test", () => {
         }
     }
 
-    /*
     it("Initializing the trie with NFTs", async () => {
         // generate 5 NFTs, and set the first account as owner
         for (let i = 1; i <= 5; i++) {
@@ -116,17 +114,18 @@ describe("mini-zk-rollup test", () => {
         }
 
         const w = await verifyTransferCircuit.calculateWitness(inputs, true);
-
         await verifyTransferCircuit.checkConstraints(w);
 
+        /*
         const { proof, publicSignals } = await snarkjs.groth16.fullProve(
             inputs,
             "./build/verify-transfer-req-test_js/verify-transfer-req-test.wasm",
             "./build/verify-transfer-req-test.zkey");
 
         const vKey = JSON.parse(fs.readFileSync("build/verify-transfer-req-test_vkey.json").toString());
-        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof, logger);
         assert(res)
+        */
     })
 
     const transferNFT = async (from: Account, to: Account, nftID: number) => {
@@ -162,13 +161,13 @@ describe("mini-zk-rollup test", () => {
         }
 
         const w = await verifyRollupTransactionCircuit.calculateWitness(inputs, true);
-
         await verifyRollupTransactionCircuit.checkConstraints(w);
         await verifyRollupTransactionCircuit.assertOut(w, {
             newRoot: trie.F.toObject(nft_res.newRoot),
             nonceNewRoot: trie.F.toObject(nonce_res.newRoot)
         });
 
+        /*
         const { proof, publicSignals } = await snarkjs.groth16.fullProve(
             inputs,
             "./build/rollup-tx-test_js/rollup-tx-test.wasm",
@@ -177,6 +176,7 @@ describe("mini-zk-rollup test", () => {
         const vKey = JSON.parse(fs.readFileSync("build/rollup-tx-test_vkey.json").toString());
         const res2 = await snarkjs.groth16.verify(vKey, publicSignals, proof, logger);
         assert(res2)
+        */
     }
 
     it("Transfer 1st NFT from account 0 to account 1", async () => {
@@ -186,7 +186,6 @@ describe("mini-zk-rollup test", () => {
     it("Transfer 1st NFT from account 1 to account 2", async () => {
         await transferNFT(accounts[1], accounts[2], 1)
     })
-    */
 
     const numToBuffer = (num: any): Buffer => {
         let hex = BigNumber.from(num).toBigInt().toString(16)
@@ -198,7 +197,6 @@ describe("mini-zk-rollup test", () => {
 
     const FIELD_SIZE = BigNumber.from('21888242871839275222246405745257275088548364400416034343698204186575808495617');
 
-    /*
     const batchTransferNFTs = async (transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
         let nftIDList = []
@@ -277,18 +275,26 @@ describe("mini-zk-rollup test", () => {
             "./build/rollup.zkey");
 
         const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
-        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof /*, logger/);
+        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof, logger/);
         assert(res)
-        /
+        */
     }
 
     it("Test the rollup", async () => {
         const transferRequest1 = await createTransferRequest(accounts[0], accounts[1], 2, 0)
         const transferRequest2 = await createTransferRequest(accounts[1], accounts[2], 2, 1)
+        const transferRequest3 = await createTransferRequest(accounts[2], accounts[1], 2, 2)
+        const transferRequest4 = await createTransferRequest(accounts[1], accounts[0], 2, 3)
+        const transferRequest5 = await createTransferRequest(accounts[0], accounts[1], 2, 4)
+        const transferRequest6 = await createTransferRequest(accounts[1], accounts[2], 2, 5)
+        const transferRequest7 = await createTransferRequest(accounts[2], accounts[1], 2, 6)
+        const transferRequest8 = await createTransferRequest(accounts[1], accounts[0], 2, 7)
 
-        await batchTransferNFTs([transferRequest1, transferRequest2])
+        await batchTransferNFTs([
+            transferRequest1, transferRequest2, transferRequest3, transferRequest4, 
+            transferRequest5, transferRequest6, transferRequest7, transferRequest8
+        ])
     })
-    */
 
     const generateBatchTransferZKP = async (_trie: any, _nonceTrie, transferRequestList: TransferRequest[]) => {
         let targetAddressList = []
@@ -362,33 +368,7 @@ describe("mini-zk-rollup test", () => {
             "./build/rollup.zkey");
     }
 
-    /*
-    it("Test the rollup verifier smart contract", async () => {
-        const transferRequest1 = createTransferRequest(accounts[0], accounts[1], 4)
-        const transferRequest2 = createTransferRequest(accounts[1], accounts[2], 4)
-        const transferRequest3 = createTransferRequest(accounts[2], accounts[3], 4)
-        const transferRequest4 = createTransferRequest(accounts[0], accounts[4], 5)
-        const transferRequest5 = createTransferRequest(accounts[4], accounts[0], 5)
-
-        const { proof, publicSignals } = await generateBatchTransferZKP(trie, [transferRequest1, transferRequest2, transferRequest3, transferRequest4, transferRequest5])
-
-        const vKey = JSON.parse(fs.readFileSync("build/rollup_vkey.json").toString());
-        const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
-        assert(res)
-
-        // console.log(publicSignals)
-
-        const res2 = await rollupVerifier.verifyProof(
-            [proof.pi_a[0], proof.pi_a[1]],
-            [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
-            [proof.pi_c[0], proof.pi_c[1]],
-            publicSignals
-        )
-        assert(res2)
-    })
-    */
-
-    const BATCH_SIZE = 64;
+    const BATCH_SIZE = 8;
 
     it("Test the rollup smart contract", async () => {
         trie = await newMemEmptyTrie()
@@ -448,15 +428,14 @@ describe("mini-zk-rollup test", () => {
         }
     })
 
-    /*
     it("Rebuild trie from calldata", async () => {
         trie = await newMemEmptyTrie()
+        nonceTrie = await newMemEmptyTrie()
 
         for (let i = 1; i <= BATCH_SIZE; i++) {
             await trie.insert(i, accounts[0].address)
+            await nonceTrie.insert(i, 0)
         }
-
-        let root = trie.F.toObject(trie.root)
 
         const events = await rollup.queryFilter(rollup.filters.RootChanged)
         for (const event of events) {
@@ -466,14 +445,17 @@ describe("mini-zk-rollup test", () => {
                 const address = pubSignals[i];
                 const nftID = pubSignals[BATCH_SIZE + i];
                 await trie.update(nftID, address)
+                const nonce = BigNumber.from(nonceTrie.F.toObject((await nonceTrie.find(nftID)).foundValue)).toNumber()
+                await nonceTrie.update(nftID, nonce + 1)
             }
-            const newRoot = trie.F.toObject(trie.root);
-            assert.equal(root, rollup.interface.parseTransaction(tx).args.at(3))
-            assert.equal(newRoot, rollup.interface.parseTransaction(tx).args.at(4))
-            root = newRoot
+
+            const newRoot = trie.F.toObject(trie.root)
+            const nonceNewRoot = nonceTrie.F.toObject(nonceTrie.root)
+            const newStateHash = poseidon.F.toObject(poseidon([newRoot, nonceNewRoot]))
+            
+            assert.equal(newStateHash, rollup.interface.parseTransaction(tx).args.at(4))
         }
     })
-    */
 
 })
 

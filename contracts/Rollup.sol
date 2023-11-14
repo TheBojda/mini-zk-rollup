@@ -33,7 +33,7 @@ contract Rollup {
         uint[2] calldata _pC,
         uint _oldRoot,
         uint _newRoot,
-        uint[128] calldata transactionList
+        uint[16] calldata transactionList
     ) external {
         require(root == _oldRoot, "Invalid old root");
 

@@ -108,4 +108,4 @@ template Rollup(nLevels, nTransactions) {
 
 }
 
-component main {public [oldStateHash, newStateHash, transactionListHash]} = Rollup(10, 64);
+component main {public [oldStateHash, newStateHash, transactionListHash]} = Rollup(10, 8);
